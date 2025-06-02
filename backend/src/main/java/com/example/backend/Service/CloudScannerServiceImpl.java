@@ -67,7 +67,7 @@ public class CloudScannerServiceImpl implements CloudScannerService {
     try (InstancesClient instancesClient = InstancesClient.create()) {
         // List all instances in all zones of your project
         // You'll need to loop through all zones; this is a simple example
-        for (com.google.cloud.compute.v1.Instance instance : instancesClient.list("your-project-id", "us-central1-a").iterateAll()) {
+        for (com.google.cloud.compute.v1.Instance instance : instancesClient.list("custom-healer-458206-t8", "us-central1-c").iterateAll()) {
             results.add(new CloudResource(
                 String.valueOf(instance.getId()),
                 "compute",
