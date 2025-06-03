@@ -118,11 +118,12 @@ public List<CloudResource> scanGcp() throws IOException {
             } catch (Exception e) {
                 // Proper error logging
                 logger.error("Error processing instance: {}", instance.getId(), e);
-            } finally {
-                // Add any cleanup code if necessary
             }
         }
-        
+    }
+    return results;
+}
+
 public double getOverallCpuUsage(String projectId) throws Exception {
     double totalCpuUsage = 0.0;
 
@@ -175,6 +176,5 @@ private double calculateCarbonFootprint(com.google.cloud.compute.v1.Instance ins
     // Calculate based on instance type and region
     return 0.0; // Placeholder
 }
-
     
 }
