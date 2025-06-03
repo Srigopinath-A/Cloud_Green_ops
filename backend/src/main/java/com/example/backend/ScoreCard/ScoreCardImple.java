@@ -18,23 +18,22 @@ import com.example.backend.Service.CloudScannerService;
 @Service
 public class ScoreCardImple implements ScorecardService{
 
-    private final CloudScannerService cloudscanner;
-    private final ResourceAnalyzerService analyzerService;
-    private final GenAiRecommendationService genAiRecommendationService;
+    @Autowired
+    private CloudScannerService cloudscanner;
 
-    public ScoreCardImple(CloudScannerService cloudscanner, ResourceAnalyzerService analyzerService, GenAiRecommendationService gRecommendationService) {
-        this.cloudscanner = cloudscanner;
-        this.analyzerService = analyzerService;
-        this.genAiRecommendationService = gRecommendationService;
-    }
+    @Autowired
+    private ResourceAnalyzerService analyzerService;
+
+    @Autowired
+    private GenAiRecommendationService genAiRecommendationService;
 
     @Override
     public Scorecard generateWeeklyScorecard() {
         try {
             System.out.println("Starting to generate weekly scorecard...");
             List<CloudResource> allRes = new ArrayList<>();
-            allRes.addAll(cloudscanner.scanAws());
-            allRes.addAll(cloudscanner.scanAzure());
+            //allRes.addAll(cloudscanner.scanAws());
+            //allRes.addAll(cloudscanner.scanAzure());
             allRes.addAll(cloudscanner.scanGcp());
     
             System.out.println("Resources scanned: " + allRes.size());

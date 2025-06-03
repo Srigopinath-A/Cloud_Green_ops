@@ -3,6 +3,7 @@ package com.example.backend.Config;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -21,20 +22,21 @@ public class GcpComputeClientFactory {
     @Value("${cloud.gcp.serviceAccountKey}")
     private String serviceAccountKey;
 
-    @Autowired
     public GcpComputeClientFactory(Environment env) {
         this.serviceAccountKey = env.getProperty("cloud.gcp.serviceAccountKey");
     }
 
-    public InstancesClient createInstancesClient() throws IOException{
+    public InstancesClient createInstancesClient() throws IOException {
+        // Load service account credentials and apply the required scope
         GoogleCredentials credentials = ServiceAccountCredentials.fromStream(
-            new ByteArrayInputStream(serviceAccountKey.getBytes(StandardCharsets.UTF_8)));
-            
-            InstancesSettings settings = InstancesSettings.newBuilder()
+            new ByteArrayInputStream(serviceAccountKey.getBytes(StandardCharsets.UTF_8)))
+            .createScoped(Collections.singletonList("https://www.googleapis.com/auth/compute")); // Ensure scope is applied
+
+        // Configure InstancesClient with the scoped credentials
+        InstancesSettings settings = InstancesSettings.newBuilder()
             .setCredentialsProvider(FixedCredentialsProvider.create(credentials))
             .build();
 
-            return InstancesClient.create(settings);
-
+        return InstancesClient.create(settings);
     }
 }
