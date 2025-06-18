@@ -6,6 +6,8 @@ import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.resourcemanager.AzureResourceManager;
 import com.example.backend.Config.GcpComputeClientFactory;
 import com.example.backend.Model.CloudResource;
+import com.example.backend.Model.CloudResourcer;
+import com.example.backend.Repo.CloudResourceRepository;
 import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.compute.v1.*;
@@ -16,17 +18,19 @@ import com.google.protobuf.util.Timestamps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse;
-//import software.amazon.awssdk.services.ec2.model.software.amazon.awssdk.services.ec2.model.Instance;
+import software.amazon.awssdk.services.ec2.model.Instance;
 import software.amazon.awssdk.services.ec2.model.Reservation;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.*;
 
 @Service
@@ -44,50 +48,91 @@ public class CloudScannerServiceImpl implements CloudScannerService {
         "n1-standard-1", 0.12
     );
 
+
+   
+    // --- REFACTOR: Use final for injected dependencies ---
     @Autowired
-    private GcpComputeClientFactory gcpComputeClientFactory;
+    private final GcpComputeClientFactory gcpComputeClientFactory;
+    @Autowired
+    private final CloudResourceRepository resourceRepository;
 
-    // @Override
-    // public List<CloudResource> scanAws() {
-    //     List<CloudResource> result = new ArrayList<>();
-    //     String accessKey = System.getenv("AWS_ACCESS_KEY");
-    //     String secretKey = System.getenv("AWS_SECRET_KEY");
-    //     String region = System.getenv("AWS_REGION");
+
+    // --- REFACTOR: Use a single constructor for all dependencies (Spring best practice) ---
+    public CloudScannerServiceImpl(CloudResourceRepository resourceRepository, GcpComputeClientFactory gcpComputeClientFactory) {
+        this.resourceRepository = resourceRepository;
+        this.gcpComputeClientFactory = gcpComputeClientFactory;
+    }
+
+    // This method will run automatically at 2 AM every day.
+    @Scheduled(cron = "0 0 2 * * ?")
+    public void scheduledAwsScan() {
+        logger.info("Starting scheduled daily scan of AWS resources...");
+        List<CloudResourcer> scannedResources = scanAws();
         
-    //     if (accessKey == null || secretKey == null || region == null) {
-    //         logger.error("AWS credentials not configured");
-    //         return result;
-    //     }
+        if (!scannedResources.isEmpty()) {
+            // Save all the newly scanned resources to the database
+            resourceRepository.saveAll(scannedResources);
+            logger.info("Successfully saved {} AWS resource snapshots to the database.", scannedResources.size());
+        } else {
+            logger.warn("Scheduled AWS scan completed, but no resources were found or saved.");
+        }
+    }
 
-    //     try (Ec2Client ec2 = Ec2Client.builder()
-    //         .region(Region.of(region))
-    //         .credentialsProvider(StaticCredentialsProvider.create(
-    //             AwsBasicCredentials.create(accessKey, secretKey)
-    //         ))
-    //         .build()) {
-            
-    //         DescribeInstancesResponse response = ec2.describeInstances();
-    //         for (Reservation reservation : response.reservations()) {
-    //             for (Instance instance : reservation.instances()) {
-    //                 result.add(new CloudResource(
-    //                     instance.instanceId(),
-    //                     "ec2",
-    //                     "AWS",
-    //                     instance.placement().availabilityZone(),
-    //                     getAwsCpuUsage(instance.instanceId(), region),
-    //                     0  // Placeholder for carbon
-    //                 ));
-    //             }
-    //         }
-    //     } catch (Exception e) {
-    //         logger.error("Error scanning AWS resources", e);
-    //     }
-    //     return result;
-    // }
+    @Override
+    // FIX: The return type must be List<CloudResource>, not CloudResourcer
+    public List<CloudResourcer> scanAws() {
+        logger.info("Executing live AWS scan...");
+        // FIX: The list must hold CloudResource objects
+        List<CloudResourcer> result = new ArrayList<>();
+        String accessKey = System.getenv("AWS_ACCESS_KEY");
+        String secretKey = System.getenv("AWS_SECRET_KEY");
+        String region = System.getenv("AWS_REGION");
 
-    // private double getAwsCpuUsage(String instanceId, String region) {
-    //     // Implement actual AWS CloudWatch API call here
-    //     return Math.random() * 100; // Placeholder
+        if (accessKey == null || secretKey == null || region == null) {
+            logger.error("AWS credentials not configured. Skipping scan.");
+            return result;
+        }
+
+        try (Ec2Client ec2 = Ec2Client.builder()
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(accessKey, secretKey)
+                ))
+                .build()) {
+
+            DescribeInstancesResponse response = ec2.describeInstances();
+            for (Reservation reservation : response.reservations()) {
+                for (Instance instance : reservation.instances()) {
+                    // FIX: The class name is CloudResource, not CloudResourcer
+                    CloudResourcer resource = new CloudResourcer();
+                    resource.setInstanceId(instance.instanceId());
+                    resource.setType("ec2");
+                    resource.setProvider("AWS");
+                    resource.setRegion(instance.placement().availabilityZone());
+                    resource.setUsage(getAwsCpuUsage(instance.instanceId(), region));
+                    resource.setCarbonfootprint(0); // Placeholder for carbon
+                    resource.setScanTimestamp(Instant.now()); // Set the timestamp!
+                    result.addAll((Collection<? extends CloudResourcer>) resource);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error during live AWS scan", e);
+        }
+        logger.info("Live AWS scan finished, found {} resources.", result.size());
+        return result;
+    }
+    
+    // Mock method for AWS CPU usage
+    private double getAwsCpuUsage(String instanceId, String region) {
+        // Implement actual AWS CloudWatch API call here
+        return Math.random() * 100; // Placeholder
+    }
+    
+    // As you don't use GCP now, you can keep it simple
+    // @Override
+    // public List<CloudResource> scanGcp() throws Exception {
+    //     logger.warn("GCP scan is not implemented in this version.");
+    //     return new ArrayList<>();
     // }
 
     // @Override
@@ -117,10 +162,10 @@ public class CloudScannerServiceImpl implements CloudScannerService {
     //     return results;
     // }
 
-    // private double getAzureCpuUsage(String vmId) {
-    //     // Implement actual Azure Monitor API call here
-    //     return Math.random() * 100; // Placeholder
-    // }
+    private double getAzureCpuUsage(String vmId) {
+        // Implement actual Azure Monitor API call here
+        return Math.random() * 100; // Placeholder
+    }
 
     @Override
     public List<CloudResource> scanGcp() throws IOException {
