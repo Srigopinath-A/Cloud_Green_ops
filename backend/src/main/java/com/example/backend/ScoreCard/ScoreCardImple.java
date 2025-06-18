@@ -34,18 +34,26 @@ import com.example.backend.Service.CloudScannerService;
 public class ScoreCardImple implements ScorecardService{
     private static final Logger logger = LoggerFactory.getLogger(ScoreCardImple.class);
 
-    @Autowired
-    private CloudScannerService cloudscanner;
+   // It's generally good practice to make all injected dependencies final if possible,
+    // and inject them via the constructor. This promotes immutability and makes
+    // dependencies explicit.
+    private final CloudScannerService cloudscanner;
+    private final ResourceAnalyzerService analyzerService;
+    private final GenAiRecommendationService genAiRecommendationService;
+    private final CloudResourceRepository resourceRepository; // This is the field that caused the error
 
-    @Autowired
-    private ResourceAnalyzerService analyzerService;
-
-    @Autowired
-    private GenAiRecommendationService genAiRecommendationService;
-
-    @Autowired
-    private final CloudResourceRepository resourceRepository;
-
+    // Constructor for dependency injection
+    // Spring will automatically call this constructor and inject the required beans.
+    @Autowired // @Autowired is optional here if there's only one constructor, but good for clarity sometimes
+    public ScoreCardImple(CloudScannerService cloudscanner,
+                          ResourceAnalyzerService analyzerService,
+                          GenAiRecommendationService genAiRecommendationService,
+                          CloudResourceRepository resourceRepository) {
+        this.cloudscanner = cloudscanner;
+        this.analyzerService = analyzerService;
+        this.genAiRecommendationService = genAiRecommendationService;
+        this.resourceRepository = resourceRepository; // Initialize the final field here
+    }
     @Override
     public Scorecard generateWeeklyScorecard() {
         try {

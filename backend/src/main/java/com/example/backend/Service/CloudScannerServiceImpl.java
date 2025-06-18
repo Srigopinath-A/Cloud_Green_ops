@@ -67,7 +67,7 @@ public class CloudScannerServiceImpl implements CloudScannerService {
     @Scheduled(cron = "0 0 2 * * ?")
     public void scheduledAwsScan() {
         logger.info("Starting scheduled daily scan of AWS resources...");
-        List<CloudResource> scannedResources = scanAws();
+        List<CloudResourcer> scannedResources = scanAws();
         
         if (!scannedResources.isEmpty()) {
             // Save all the newly scanned resources to the database
@@ -80,10 +80,10 @@ public class CloudScannerServiceImpl implements CloudScannerService {
 
     @Override
     // FIX: The return type must be List<CloudResource>, not CloudResourcer
-    public List<CloudResource> scanAws() {
+    public List<CloudResourcer> scanAws() {
         logger.info("Executing live AWS scan...");
         // FIX: The list must hold CloudResource objects
-        List<CloudResource> result = new ArrayList<>();
+        List<CloudResourcer> result = new ArrayList<>();
         String accessKey = System.getenv("AWS_ACCESS_KEY");
         String secretKey = System.getenv("AWS_SECRET_KEY");
         String region = System.getenv("AWS_REGION");
@@ -112,7 +112,7 @@ public class CloudScannerServiceImpl implements CloudScannerService {
                     resource.setUsage(getAwsCpuUsage(instance.instanceId(), region));
                     resource.setCarbonfootprint(0); // Placeholder for carbon
                     resource.setScanTimestamp(Instant.now()); // Set the timestamp!
-                    result.addAll((Collection<? extends CloudResource>) resource);
+                    result.addAll((Collection<? extends CloudResourcer>) resource);
                 }
             }
         } catch (Exception e) {
