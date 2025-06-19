@@ -8,4 +8,5 @@ import java.time.LocalDate;
 public interface ScorecardService {
     Scorecard generateWeeklyScorecard();
     Scorecardaws generateAWSScorecard(LocalDate forDate);
+    Scorecard  generateAzureWeeklyScorecard();
 }

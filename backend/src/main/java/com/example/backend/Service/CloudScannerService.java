@@ -8,7 +8,7 @@ import com.example.backend.Model.CloudResourcer;
 public interface CloudScannerService {
 
     List<CloudResourcer> scanAws();
-    //List<CloudResource> scanAzure();
+    List<CloudResource> scanAzure();
     List<CloudResource> scanGcp() throws Exception;
 
 }

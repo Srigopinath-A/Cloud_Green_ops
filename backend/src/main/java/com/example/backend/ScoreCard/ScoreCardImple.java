@@ -134,5 +134,44 @@ public class ScoreCardImple implements ScorecardService{
                     return new CloudResourcer(null, first.getInstanceId(), first.getType(), first.getProvider(), first.getRegion(), avgUsage, avgCarbon, null);
                 }).collect(Collectors.toList());
     }
+
+    @Override
+    public Scorecard generateAzureWeeklyScorecard() {
+        try {
+            logger.info("Starting to generate Azure-specific weekly scorecard...");
+            List<CloudResource> azureResources = cloudscanner.scanAzure();
+            
+            logger.info("Azure resources scanned: {}", azureResources.size());
+            
+            // Filter resources to analyze only those from Azure
+            // (scanAzure already returns only Azure, but good practice if mixed source)
+            List<CloudResource> filteredAzureResources = azureResources.stream()
+                .filter(res -> "Azure".equalsIgnoreCase(res.getProvider()))
+                .collect(Collectors.toList());
+
+            logger.info("Filtered Azure resources for analysis: {}", filteredAzureResources.size());
+
+            List<ResourceFinding> azureFindings = analyzerService.analyze(filteredAzureResources);
+            logger.info("Azure specific findings: {}", azureFindings.size());
+            
+            List<Rcommendation> azureRecs = genAiRecommendationService.recommed(azureFindings);
+            logger.info("Azure specific recommendations: {}", azureRecs.size());
+    
+            double score = 100.0;
+            if (!azureFindings.isEmpty()) {
+                // Score deduction. You might want a different scoring logic for specific clouds
+                score = Math.max(0, 100.0 - azureFindings.size() * 7.0); // Slightly more punitive for Azure specific (example)
+            } else {
+                score = 100.0;
+            }
+
+            String week = LocalDate.now().toString();
+            logger.info("Azure-specific scorecard generated successfully for week {}. Score: {}", week, score);
+            return new Scorecard(score, azureRecs, week);
+        } catch (Exception e) {
+            logger.error("Error generating Azure weekly scorecard: " + e.getMessage(), e);
+            throw new RuntimeException("Error generating Azure weekly scorecard", e);
+        }
+    }
 }
 
