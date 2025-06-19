@@ -20,12 +20,12 @@ public class ScorecardController {
     @Autowired
     private ScorecardService scorecardService;
 
-    @GetMapping("/scorecard") // Use lowercase for consistency
+    @GetMapping("/scorecard/gcp") // Use lowercase for consistency
     public Scorecard getWeeklyScorecard() {
         return scorecardService.generateWeeklyScorecard();
     }
 
-    @GetMapping("/scorecardaws")
+    @GetMapping("/scorecard/aws")
     public ResponseEntity<Scorecardaws> getWeeklyScorecard(
             // Make the date parameter optional. If not provided, it will use the current date.
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
@@ -35,5 +35,10 @@ public class ScorecardController {
 
         Scorecardaws scorecard = scorecardService.generateAWSScorecard(targetDate);
         return ResponseEntity.ok(scorecard);
+    }
+
+    @GetMapping("/scorecard/azure") // New endpoint for Azure-specific scorecard
+    public Scorecard getWeeklyAzureScorecard() {
+        return scorecardService.generateAzureWeeklyScorecard();
     }
 }
