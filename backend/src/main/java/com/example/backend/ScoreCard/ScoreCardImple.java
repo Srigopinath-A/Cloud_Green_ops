@@ -82,6 +82,8 @@ public class ScoreCardImple implements ScorecardService{
         }
     }
 
+
+    
      @Override
     public Scorecardaws generateAWSScorecard(LocalDate forDate) {
         logger.info("Generating weekly scorecard for the week of {}", forDate);
