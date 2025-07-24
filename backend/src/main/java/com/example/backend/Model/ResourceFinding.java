@@ -10,8 +10,8 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 @Document(collection = "ResourceFinding")
-@Getter
 @Setter
+@Getter
 public class ResourceFinding {
     private CloudResource resource;
     private String IssueType; //overprovisied,idel, carbon heavy resouce 

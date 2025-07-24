@@ -8,15 +8,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.time.DayOfWeek;
-import java.time.temporal.TemporalAdjusters;
 import com.example.backend.Analyzer.ResourceAnalyzerService;
 import com.example.backend.GenAi.GenAiRecommendationService;
 import com.example.backend.Model.CloudResource;
@@ -31,110 +27,96 @@ import com.example.backend.Repo.CloudResourceRepository;
 import com.example.backend.Service.CloudScannerService;
 
 @Service
-public class ScoreCardImple implements ScorecardService{
+public class ScoreCardImple implements ScorecardService {
     private static final Logger logger = LoggerFactory.getLogger(ScoreCardImple.class);
 
-   // It's generally good practice to make all injected dependencies final if possible,
-    // and inject them via the constructor. This promotes immutability and makes
-    // dependencies explicit.
     private final CloudScannerService cloudscanner;
     private final ResourceAnalyzerService analyzerService;
     private final GenAiRecommendationService genAiRecommendationService;
-    private final CloudResourceRepository resourceRepository; // This is the field that caused the error
+    private final CloudResourceRepository resourceRepository;
 
-    // Constructor for dependency injection
-    // Spring will automatically call this constructor and inject the required beans.
-    @Autowired // @Autowired is optional here if there's only one constructor, but good for clarity sometimes
+    @Autowired
     public ScoreCardImple(CloudScannerService cloudscanner,
-                          ResourceAnalyzerService analyzerService,
-                          GenAiRecommendationService genAiRecommendationService,
-                          CloudResourceRepository resourceRepository) {
+                        ResourceAnalyzerService analyzerService,
+                        GenAiRecommendationService genAiRecommendationService,
+                        CloudResourceRepository resourceRepository) {
         this.cloudscanner = cloudscanner;
         this.analyzerService = analyzerService;
         this.genAiRecommendationService = genAiRecommendationService;
-        this.resourceRepository = resourceRepository; // Initialize the final field here
+        this.resourceRepository = resourceRepository;
     }
+
     @Override
     public Scorecard generateWeeklyScorecard() {
         try {
-            System.out.println("Starting to generate weekly scorecard...");
-            List<CloudResource> allRes = new ArrayList<>();
-            allRes.add((CloudResource) cloudscanner.scanAws());
-            allRes.addAll(cloudscanner.scanAzure());
-            allRes.addAll(cloudscanner.scanGcp());
-    
-            System.out.println("Resources scanned: " + allRes.size());
-            List<ResourceFinding> findings = analyzerService.analyze(allRes);
-            System.out.println("Findings: " + findings.size());
-            List<Rcommendation> recs = genAiRecommendationService.recommed(findings);
-            System.out.println("Recommendations: " + recs.size());
-    
-            double score = 100.0;
-            if (!findings.isEmpty()) {
-                score = 100.0 - findings.size() * 5.0;
+            logger.info("Starting to generate weekly scorecard...");
+            
+            // Initialize empty lists for each cloud provider
+            List<CloudResource> allResources = new ArrayList<>();
+            
+            // Scan each cloud provider separately and handle results properly
+            try {
+                List<CloudResource> awsResources = safeCastToCloudResourceList(cloudscanner.scanAws());
+                allResources.addAll(awsResources);
+            } catch (Exception e) {
+                logger.error("Failed to scan AWS resources: {}", e.getMessage());
             }
+            
+            allResources.addAll(cloudscanner.scanAzure());
+            allResources.addAll(cloudscanner.scanGcp());
+
+            logger.info("Total resources scanned: {}", allResources.size());
+            
+            List<ResourceFinding> findings = analyzerService.analyze(allResources);
+            logger.info("Total findings identified: {}", findings.size());
+            
+            List<Rcommendation> recommendations = genAiRecommendationService.recommed(findings);
+            logger.info("Generated recommendations: {}", recommendations.size());
+
+            double score = calculateScore(findings);
             String week = LocalDate.now().toString();
-            System.out.println("Scorecard generated successfully.");
-            return new Scorecard(score, recs, week);
+            
+            logger.info("Weekly scorecard generated successfully with score: {}", score);
+            return new Scorecard(score, recommendations, week);
         } catch (Exception e) {
-            System.err.println("Error generating weekly scorecard: " + e.getMessage());
+            logger.error("Error generating weekly scorecard: {}", e.getMessage(), e);
             throw new RuntimeException("Error generating weekly scorecard", e);
         }
     }
 
-
-    
-     @Override
+    @Override
     public Scorecardaws generateAWSScorecard(LocalDate forDate) {
-        logger.info("Generating weekly scorecard for the week of {}", forDate);
+        try {
+            logger.info("Generating AWS scorecard for the week of {}", forDate);
 
-        // 1. Define the time range for the week
-        Instant startOfWeek = forDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay().toInstant(ZoneOffset.UTC);
-        Instant endOfWeek = forDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            Instant startOfWeek = forDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                                       .atStartOfDay()
+                                       .toInstant(ZoneOffset.UTC);
+            Instant endOfWeek = forDate.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))
+                                     .plusDays(1)
+                                     .atStartOfDay()
+                                     .toInstant(ZoneOffset.UTC);
 
-        // 2. Fetch the historical data for that week from MongoDB
-        List<CloudResourcer> weeklySnapshots = resourceRepository.findByScanTimestampBetween(startOfWeek, endOfWeek);
-        logger.info("Found {} resource snapshots for the week between {} and {}", weeklySnapshots.size(), startOfWeek, endOfWeek);
+            List<CloudResourcer> weeklySnapshots = resourceRepository.findByScanTimestampBetween(startOfWeek, endOfWeek);
+            logger.info("Found {} AWS resource snapshots for the week", weeklySnapshots.size());
 
-        if (weeklySnapshots.isEmpty()) {
-            return new Scorecardaws(100.0, List.of(), "Week of " + startOfWeek.toString().substring(0, 10)); // Perfect score if no resources
+            if (weeklySnapshots.isEmpty()) {
+                return new Scorecardaws(100.0, List.of(), "Week of " + startOfWeek.toString().substring(0, 10));
+            }
+
+            List<CloudResourcer> averagedResources = averageResourcesOverWeek(weeklySnapshots);
+            List<ResourceFindingaws> findings = analyzerService.analyzeaws(averagedResources);
+            List<Rcommendationaws> recommendations = genAiRecommendationService.recommedaws(findings);
+
+            double score = calculateScoreForAWS(findings);
+            String week = "Week of " + startOfWeek.toString().substring(0, 10);
+            
+            logger.info("AWS scorecard generated successfully with score: {}", score);
+            return new Scorecardaws(score, recommendations, week);
+        } catch (Exception e) {
+            logger.error("Error generating AWS scorecard: {}", e.getMessage(), e);
+            throw new RuntimeException("Error generating AWS scorecard", e);
         }
-
-        // 3. To analyze, we need the *average* state of each resource for the week
-        List<CloudResourcer> averagedResources = averageResourcesOverWeek(weeklySnapshots);
-        
-        // 4. Analyze the averaged data
-        List<ResourceFindingaws> findings = analyzerService.analyzeaws(averagedResources);
-        logger.info("Analysis complete. Found {} issues.", findings.size());
-
-        // 5. Generate recommendations based on findings
-        List<Rcommendationaws> recs = genAiRecommendationService.recommedaws(findings);
-        logger.info("Generated {} recommendations.", recs.size());
-
-        // 6. Calculate the score
-        double score = 100.0 - (findings.size() * 5.0); // Keep your logic
-        String week = "Week of " + startOfWeek.toString().substring(0, 10);
-        
-        logger.info("Scorecard generated successfully with score: {}", score);
-        return new Scorecardaws(score, recs, week);
-    }
-    
-    // Helper method to process historical data
-    private List<CloudResourcer> averageResourcesOverWeek(List<CloudResourcer> snapshots) {
-        // Group snapshots by the unique instance ID
-        Map<String, List<CloudResourcer>> snapshotsByInstanceId = snapshots.stream()
-                .collect(Collectors.groupingByConcurrent(CloudResourcer::getInstanceId));
-        
-        // For each instance, calculate its average state over the week
-        return snapshotsByInstanceId.values().stream()
-                .map(instanceSnapshots -> {
-                    CloudResourcer first = instanceSnapshots.get(0);
-                    double avgUsage = instanceSnapshots.stream().mapToDouble(CloudResourcer::getUsage).average().orElse(0.0);
-                    double avgCarbon = instanceSnapshots.stream().mapToDouble(CloudResourcer::getCarbonfootprint).average().orElse(0.0);
-                   
-                    // Create a single representative CloudResource object for analysis
-                    return new CloudResourcer(null, first.getInstanceId(), first.getType(), first.getProvider(), first.getRegion(), avgUsage, avgCarbon, null);
-                }).collect(Collectors.toList());
     }
 
     @Override
@@ -142,38 +124,77 @@ public class ScoreCardImple implements ScorecardService{
         try {
             logger.info("Starting to generate Azure-specific weekly scorecard...");
             List<CloudResource> azureResources = cloudscanner.scanAzure();
-            
             logger.info("Azure resources scanned: {}", azureResources.size());
+
+            List<ResourceFinding> findings = analyzerService.analyze(azureResources);
+            logger.info("Azure findings identified: {}", findings.size());
             
-            // Filter resources to analyze only those from Azure
-            // (scanAzure already returns only Azure, but good practice if mixed source)
-            List<CloudResource> filteredAzureResources = azureResources.stream()
-                .filter(res -> "Azure".equalsIgnoreCase(res.getProvider()))
-                .collect(Collectors.toList());
+            List<Rcommendation> recommendations = genAiRecommendationService.recommed(findings);
+            logger.info("Azure recommendations generated: {}", recommendations.size());
 
-            logger.info("Filtered Azure resources for analysis: {}", filteredAzureResources.size());
-
-            List<ResourceFinding> azureFindings = analyzerService.analyze(filteredAzureResources);
-            logger.info("Azure specific findings: {}", azureFindings.size());
-            
-            List<Rcommendation> azureRecs = genAiRecommendationService.recommed(azureFindings);
-            logger.info("Azure specific recommendations: {}", azureRecs.size());
-    
-            double score = 100.0;
-            if (!azureFindings.isEmpty()) {
-                // Score deduction. You might want a different scoring logic for specific clouds
-                score = Math.max(0, 100.0 - azureFindings.size() * 7.0); // Slightly more punitive for Azure specific (example)
-            } else {
-                score = 100.0;
-            }
-
+            double score = calculateScoreForAzure(findings);
             String week = LocalDate.now().toString();
-            logger.info("Azure-specific scorecard generated successfully for week {}. Score: {}", week, score);
-            return new Scorecard(score, azureRecs, week);
+            
+            logger.info("Azure scorecard generated successfully with score: {}", score);
+            return new Scorecard(score, recommendations, week);
         } catch (Exception e) {
-            logger.error("Error generating Azure weekly scorecard: " + e.getMessage(), e);
+            logger.error("Error generating Azure scorecard: {}", e.getMessage(), e);
             throw new RuntimeException("Error generating Azure weekly scorecard", e);
         }
     }
-}
 
+    // Helper Methods
+    private List<CloudResource> safeCastToCloudResourceList(Object scanResult) {
+        if (scanResult instanceof List) {
+            try {
+                return ((List<?>) scanResult).stream()
+                    .filter(CloudResource.class::isInstance)
+                    .map(CloudResource.class::cast)
+                    .collect(Collectors.toList());
+            } catch (ClassCastException e) {
+                logger.warn("Failed to cast scan result to CloudResource list", e);
+            }
+        }
+        return new ArrayList<>();
+    }
+
+    private List<CloudResourcer> averageResourcesOverWeek(List<CloudResourcer> snapshots) {
+        return snapshots.stream()
+            .collect(Collectors.groupingBy(CloudResourcer::getInstanceId))
+            .values().stream()
+            .map(this::calculateAverageResource)
+            .collect(Collectors.toList());
+    }
+
+    private CloudResourcer calculateAverageResource(List<CloudResourcer> resources) {
+        CloudResourcer first = resources.get(0);
+        double avgUsage = resources.stream().mapToDouble(CloudResourcer::getUsage).average().orElse(0.0);
+        double avgCarbon = resources.stream().mapToDouble(CloudResourcer::getCarbonfootprint).average().orElse(0.0);
+        
+        return new CloudResourcer(
+            null, 
+            first.getInstanceId(), 
+            first.getType(), 
+            first.getProvider(), 
+            first.getRegion(), 
+            avgUsage, 
+            avgCarbon, 
+            null
+        );
+    }
+
+    private double calculateScore(List<ResourceFinding> findings) {
+        if (findings.isEmpty()) return 100.0;
+        return Math.max(0, 100.0 - (findings.size() * 5.0));
+    }
+
+    private double calculateScoreForAWS(List<ResourceFindingaws> findings) {
+        if (findings.isEmpty()) return 100.0;
+        return Math.max(0, 100.0 - (findings.size() * 5.0));
+    }
+
+    private double calculateScoreForAzure(List<ResourceFinding> findings) {
+        if (findings.isEmpty()) return 100.0;
+        return Math.max(0, 100.0 - (findings.size() * 7.0));
+    }
+}
