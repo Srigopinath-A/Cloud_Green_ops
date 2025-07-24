@@ -1,3 +1,5 @@
+import { ScorecardResponse } from "../services/api";
+
 export interface BaseMetrics {
     id: string;
     timestamp: string;
@@ -26,22 +28,28 @@ export interface AWSMetrics extends BaseMetrics {
     };
 }
 
-export interface GCPMetrics extends BaseMetrics {
-    computeEngine: {
-        activeInstances: number;
-        cpuUtilization: number;
-        memoryUsage: number;
-    };
-    cloudStorage: {
-        bucketCount: number;
-        totalSize: number;
-    };
+export interface GCPMetrics extends ScorecardResponse {
+    totalCost: number;
+    status: 'success' | 'warning' | 'critical';
     networkUsage: {
         ingress: number;
         egress: number;
         cost: number;
     };
+    cloudStorage: {
+        bucketCount: number;
+        totalSize: number;
+    };
+    computeEngine: {
+        name: string;
+        region: string;
+        cpuUtilization: number;
+        status: string;
+        recommendation: string;
+    }[];
 }
+
+
 
 export interface AzureMetrics extends BaseMetrics {
     virtualMachines: {
@@ -76,4 +84,11 @@ export interface FilterOptions {
     endDate?: Date;
     provider?: CloudProvider;
     resourceType?: string;
+}
+
+
+export interface Scorecard {
+  score: number;
+  week: string;
+  recommendations: { recommendation: string }[];
 }

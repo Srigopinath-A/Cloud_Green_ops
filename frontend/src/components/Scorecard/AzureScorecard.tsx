@@ -1,6 +1,8 @@
+// src/components/AzureScorecard.tsx
+
 import React, { useEffect, useState } from 'react';
-import { fetchAWSScorecard, fetchAzureScorecard } from '../../services/api';
-import { AWSMetrics, AzureMetrics, ErrorState } from '../../types';
+import { fetchAzureScorecard } from '../../services/api';
+import { AzureMetrics, ErrorState } from '../../types';
 
 const AzureScorecard: React.FC = () => {
     const [scorecard, setScorecard] = useState<AzureMetrics | null>(null);
@@ -11,34 +13,7 @@ const AzureScorecard: React.FC = () => {
         const getScorecard = async () => {
             try {
                 const data = await fetchAzureScorecard();
-                // Transform and validate data
-                const transformedData: AzureMetrics = {
-                    id: data.id ?? '',
-                    timestamp: data.timestamp ?? new Date().toISOString(),
-                    carbonEmissions: data.carbonEmissions ?? 0,
-                    resourceUtilization: data.resourceUtilization ?? 0,
-                    recommendations: data.recommendations ?? [],
-                    status: ['success', 'warning', 'critical'].includes(data.status) ? data.status as 'success' | 'warning' | 'critical' : 'warning',
-                    totalCost: data.totalCost ?? 0,
-                    virtualMachines: {
-                        total: data.virtualMachines?.total ?? 0,
-                        active: data.virtualMachines?.active ?? 0,
-                        performanceMetrics: {
-                            cpu: data.virtualMachines?.performanceMetrics?.cpu ?? 0,
-                            memory: data.virtualMachines?.performanceMetrics?.memory ?? 0,
-                            disk: data.virtualMachines?.performanceMetrics?.disk ?? 0
-                        }
-                    },
-                    storage: {
-                        blobSize: data.storage?.blobSize ?? 0,
-                        tableStorage: data.storage?.tableStorage ?? 0
-                    },
-                    services: {
-                        active: data.services?.active ?? [],
-                        resourceGroups: data.services?.resourceGroups ?? 0
-                    }
-                };
-                setScorecard(transformedData);
+                setScorecard(data);
             } catch (err) {
                 setError({
                     message: 'Failed to fetch Azure scorecard data',
@@ -62,30 +37,17 @@ const AzureScorecard: React.FC = () => {
                 <div className="metrics-container">
                     <div className="metric-group">
                         <h3>General Metrics</h3>
-                        <div className="metric-item">
-                            <label>Carbon Emissions:</label>
-                            <span>{scorecard.carbonEmissions} CO2e</span>
-                        </div>
-                        <div className="metric-item">
-                            <label>Resource Utilization:</label>
-                            <span>{scorecard.resourceUtilization}%</span>
-                        </div>
+                        <p>Carbon Emissions: {scorecard.carbonEmissions} CO2e</p>
+                        <p>Resource Utilization: {scorecard.resourceUtilization}%</p>
                     </div>
 
                     <div className="metric-group">
                         <h3>Virtual Machines</h3>
-                        <div className="metric-item">
-                            <label>Total VMs:</label>
-                            <span>{scorecard.virtualMachines.total}</span>
-                        </div>
-                        <div className="metric-item">
-                            <label>Active VMs:</label>
-                            <span>{scorecard.virtualMachines.active}</span>
-                        </div>
-                        <div className="metric-item">
-                            <label>CPU Usage:</label>
-                            <span>{scorecard.virtualMachines.performanceMetrics.cpu}%</span>
-                        </div>
+                        <p>Total VMs: {scorecard.virtualMachines.total}</p>
+                        <p>Active VMs: {scorecard.virtualMachines.active}</p>
+                        <p>CPU Usage: {scorecard.virtualMachines.performanceMetrics.cpu}%</p>
+                        <p>Memory Usage: {scorecard.virtualMachines.performanceMetrics.memory}%</p>
+                        <p>Disk Usage: {scorecard.virtualMachines.performanceMetrics.disk}%</p>
                     </div>
 
                     <div className="metric-group">

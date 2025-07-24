@@ -59,8 +59,8 @@ public class ScoreCardImple implements ScorecardService{
         try {
             System.out.println("Starting to generate weekly scorecard...");
             List<CloudResource> allRes = new ArrayList<>();
-            //allRes.addAll(cloudscanner.scanAws());
-            //allRes.addAll(cloudscanner.scanAzure());
+            allRes.add((CloudResource) cloudscanner.scanAws());
+            allRes.addAll(cloudscanner.scanAzure());
             allRes.addAll(cloudscanner.scanGcp());
     
             System.out.println("Resources scanned: " + allRes.size());
