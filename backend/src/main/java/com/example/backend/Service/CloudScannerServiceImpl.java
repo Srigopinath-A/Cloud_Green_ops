@@ -1,10 +1,12 @@
 package com.example.backend.Service;
 
 import com.azure.core.management.AzureEnvironment;
+import com.azure.core.management.exception.ManagementException;
 import com.azure.core.management.profile.AzureProfile;
 import com.azure.identity.DefaultAzureCredentialBuilder;
 import com.azure.resourcemanager.AzureResourceManager;
 import com.azure.resourcemanager.compute.models.VirtualMachine;
+import com.azure.resourcemanager.storage.models.Sku;
 import com.azure.resourcemanager.storage.models.StorageAccount;
 import com.example.backend.Config.AzureResourcemanagerFactor;
 import com.example.backend.Config.GcpComputeClientFactory;
@@ -21,6 +23,7 @@ import com.google.protobuf.util.Timestamps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -59,14 +62,29 @@ public class CloudScannerServiceImpl implements CloudScannerService {
     @Autowired
     private final CloudResourceRepository resourceRepository;
 
+
+
     private final Random random = new Random();
 
+    private final AzureResourcemanagerFactor azureResourcemanagerFactor;
+    private final String azureTenantId;
+    private final String azureSubscriptionId;
 
     // --- REFACTOR: Use a single constructor for all dependencies (Spring best practice) ---
-    public CloudScannerServiceImpl(CloudResourceRepository resourceRepository, GcpComputeClientFactory gcpComputeClientFactory) {
-        this.resourceRepository = resourceRepository;
-        this.gcpComputeClientFactory = gcpComputeClientFactory;
-    }
+    @Autowired
+public CloudScannerServiceImpl(
+        CloudResourceRepository resourceRepository,
+        GcpComputeClientFactory gcpComputeClientFactory,
+        AzureResourcemanagerFactor azureResourcemanagerFactor,
+        @Value("${azure.tenant-id}") String azureTenantId,
+        @Value("${azure.subscription-id}") String azureSubscriptionId) {
+    this.resourceRepository = resourceRepository;
+    this.gcpComputeClientFactory = gcpComputeClientFactory;
+    this.azureResourcemanagerFactor = azureResourcemanagerFactor;
+    this.azureTenantId = azureTenantId;
+    this.azureSubscriptionId = azureSubscriptionId;
+}
+    
 
     // This method will run automatically at 2 AM every day.
     @Scheduled(cron = "0 0 2 * * ?")
@@ -134,117 +152,91 @@ public class CloudScannerServiceImpl implements CloudScannerService {
     }
     
  
-    
     @Override
-    public List<CloudResource> scanAzure() {
-        List<CloudResource> result = new ArrayList<>();
+public List<CloudResource> scanAzure() {
+    List<CloudResource> result = new ArrayList<>();
+    
+    try {
+        AzureResourceManager azure = azureResourcemanagerFactor.createAzureResourceManager();
         
-        String clientId = System.getenv("AZURE_CLIENT_ID");
-        String clientSecret = System.getenv("AZURE_CLIENT_SECRET");
-        String tenantId = System.getenv("AZURE_TENANT_ID");     
-        String subscriptionId = System.getenv("AZURE_SUBSCRIPTION_ID");
-
-        if (clientId == null || clientSecret == null || tenantId == null || subscriptionId == null) {
-            logger.error("Azure credentials not configured (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID)");
-            return result;
-        }
-
-        try {
-            // CORRECTED LINE: Call the method on the AUTOWIRED INSTANCE
-            AzureResourceManager azureResourceManager = AzureResourcemanagerFactor.createAzureResourceManager(
-                clientId, clientSecret, tenantId, subscriptionId
-            );
-
-            // Scan Virtual Machines
-            logger.info("Scanning Azure Virtual Machines...");
-            for (VirtualMachine vm : azureResourceManager.virtualMachines().list()) {
-                double usage = calculateAzureVmUsage(vm);
-                double carbonFootprint = calculateAzureResourceCarbonPrint(vm.regionName());
+        // Process VMs (handles PagedIterable properly)
+        azure.virtualMachines().list().stream()
+            .forEach(vm -> {
                 result.add(new CloudResource(
                     vm.id(),
                     "VirtualMachine",
                     "Azure",
                     vm.regionName(),
-                    usage,
-                    carbonFootprint
+                    calculateAzureVmUsage(vm),
+                    calculateAzureResourceCarbonPrint(vm.regionName())
                 ));
-            }
-
-            // Scan Storage Accounts (Example)
-            logger.info("Scanning Azure Storage Accounts...");
-            for (StorageAccount sa : azureResourceManager.storageAccounts().list()) {
-                double usage = calculateAzureStorageUsage(sa);
-                double carbonFootprint = calculateAzureResourceCarbonPrint(sa.regionName());
+            });
+        
+        // Process Storage Accounts
+        azure.storageAccounts().list().stream()
+            .forEach(sa -> {
                 result.add(new CloudResource(
                     sa.id(),
                     "StorageAccount",
                     "Azure",
                     sa.regionName(),
-                    usage,
-                    carbonFootprint
+                    calculateAzureStorageUsage(sa),
+                    calculateAzureResourceCarbonPrint(sa.regionName())
                 ));
-            }
-            logger.info("Successfully scanned {} Azure resources (VMs and Storage Accounts).", result.size());
-
-        } catch (Exception e) {
-            logger.error("Error scanning Azure resources: " + e.getMessage(), e);
-        }
-        return result;
+            });
+            
+    } catch (ManagementException e) {
+        logger.error("Azure management error: {}", e.getMessage(), e);
+    } catch (Exception e) {
+        logger.error("Unexpected error scanning Azure", e);
     }
+    
+    return result;
+}
 
-
+    
     private double calculateAzureVmUsage(VirtualMachine vm) {
-        // Get the power state string, preferring toString() for the API-friendly value
-        // and handling null gracefully.
-        String powerStateStr = vm.powerState() != null ? vm.powerState().toString() : "UNKNOWN";
-        
-        // Use equalsIgnoreCase for robust comparison
-        if (powerStateStr.equalsIgnoreCase("running") || powerStateStr.equalsIgnoreCase("starting")) {
-             return 50.0 + random.nextDouble() * 40.0; // Random between 50-90% for running
-        } else if (powerStateStr.equalsIgnoreCase("stopped") || powerStateStr.equalsIgnoreCase("deallocated")) {
-            return 1.0 + random.nextDouble() * 3.0; // Very low for stopped/deallocated
-        }
-        return 10.0 + random.nextDouble() * 10.0; // Others, e.g., provisioning/failed
+        String powerState = Optional.ofNullable(vm.powerState())
+            .map(Objects::toString)
+            .orElse("UNKNOWN")
+            .toLowerCase();
+    
+        return switch (powerState) {
+            case "running", "starting" -> 50.0 + random.nextDouble() * 40.0;
+            case "stopped", "deallocated" -> 1.0 + random.nextDouble() * 3.0;
+            default -> 10.0 + random.nextDouble() * 10.0;
+        };
     }
-
+    
     private double calculateAzureStorageUsage(StorageAccount sa) {
-        double baseUsage = 0;
-        if (sa.innerModel().sku() != null) {
-            // Get the SkuName enum and then convert it to a string for comparison.
-            // Using .toString() on the SkuName enum directly.
-            String skuNameLower = sa.innerModel().sku().name().toString().toLowerCase();
-
-            switch(skuNameLower) {
-                case "standard_lrs": baseUsage = 20.0; break;
-                case "standard_grs": baseUsage = 25.0; break;
-                case "premium_lrs": baseUsage = 40.0; break;
-                default: baseUsage = 15.0; break;
-            }
-        }
-        return baseUsage + random.nextDouble() * 30.0; // Add some variability
+        double baseUsage = switch (Optional.ofNullable(sa.innerModel().sku())
+            .map(Sku::name)
+            .map(Objects::toString)
+            .map(String::toLowerCase)
+            .orElse("unknown")) {
+                case "standard_lrs" -> 20.0;
+                case "standard_grs" -> 25.0;
+                case "premium_lrs" -> 40.0;
+                default -> 15.0;
+            };
+        return baseUsage + random.nextDouble() * 30.0;
     }
-
+    
     private double calculateAzureResourceCarbonPrint(String region) {
-        // More specific dummy carbon footprint based on Azure's own carbon intensity claims and general knowledge.
-        // Regions like Sweden Central, Norway East, US Central (Iowa) are generally greener.
-        // Units could be kgCO2e/KWh or similar, actual values are illustrative.
-        switch (region.toLowerCase()) {
-            case "swedencentral":
-            case "norwayeast":
-            case "westus3": // Arizona
-            case "westus2": // Washington State (hydro)
-                return 20.0 + random.nextDouble() * 10.0; // Very low carbon
-            case "usgovvirginia": // US Gov regions
-                return 30.0 + random.nextDouble() * 15.0; // Low carbon
-            case "eastus":
-            case "northcentralus":
-                return 40.0 + random.nextDouble() * 20.0; // Medium carbon (mixed grid)
-            case "southeastasia":
-            case "brazilsouth":
-                return 60.0 + random.nextDouble() * 25.0; // Higher carbon (more fossil fuel reliance)
-            default:
-                return 50.0 + random.nextDouble() * 30.0; // Average
-        }
+        if (region == null) return 50.0; // Default if region unknown
+        
+        return switch (region.toLowerCase()) {
+            case "swedencentral", "norwayeast", "westus3", "westus2" -> 
+                20.0 + random.nextDouble() * 10.0;
+            case "usgovvirginia" -> 
+                30.0 + random.nextDouble() * 15.0;
+            case "eastus", "northcentralus" -> 
+                40.0 + random.nextDouble() * 20.0;
+            case "southeastasia", "brazilsouth" -> 
+                60.0 + random.nextDouble() * 25.0;
+            default -> 
+                50.0 + random.nextDouble() * 30.0;
+        };
     }
 
 
