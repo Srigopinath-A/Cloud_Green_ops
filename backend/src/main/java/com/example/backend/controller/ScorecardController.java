@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,7 +16,7 @@ import com.example.backend.Model.Scorecard;
 import com.example.backend.Model.Scorecardaws;
 import com.example.backend.ScoreCard.ScorecardService;
 
-@RestController
+@Controller
 @CrossOrigin("http://localhost:5173/")
 public class ScorecardController {
 

@@ -151,48 +151,52 @@ public CloudScannerServiceImpl(
         return Math.random() * 100; // Placeholder
     }
     
- 
+
     @Override
 public List<CloudResource> scanAzure() {
     List<CloudResource> result = new ArrayList<>();
-    
+
     try {
-        AzureResourceManager azure = azureResourcemanagerFactor.createAzureResourceManager();
-        
-        // Process VMs (handles PagedIterable properly)
-        azure.virtualMachines().list().stream()
-            .forEach(vm -> {
-                result.add(new CloudResource(
-                    vm.id(),
-                    "VirtualMachine",
-                    "Azure",
-                    vm.regionName(),
-                    calculateAzureVmUsage(vm),
-                    calculateAzureResourceCarbonPrint(vm.regionName())
-                ));
-            });
-        
+        // Use the AzureResourceManager bean from your custom factory
+        AzureResourceManager azure = azureResourcemanagerFactor.azureResourceManager(
+            azureResourcemanagerFactor.azureCredential(),
+            azureResourcemanagerFactor.azureProfile()
+        );
+
+        // Process Virtual Machines
+        azure.virtualMachines().list().forEach(vm -> {
+            result.add(new CloudResource(
+                vm.id(),
+                "VirtualMachine",
+                "Azure",
+                vm.regionName(),
+                calculateAzureVmUsage(vm),
+                calculateAzureResourceCarbonPrint(vm.regionName())
+            ));
+        });
+
         // Process Storage Accounts
-        azure.storageAccounts().list().stream()
-            .forEach(sa -> {
-                result.add(new CloudResource(
-                    sa.id(),
-                    "StorageAccount",
-                    "Azure",
-                    sa.regionName(),
-                    calculateAzureStorageUsage(sa),
-                    calculateAzureResourceCarbonPrint(sa.regionName())
-                ));
-            });
-            
+        azure.storageAccounts().list().forEach(sa -> {
+            result.add(new CloudResource(
+                sa.id(),
+                "StorageAccount",
+                "Azure",
+                sa.regionName(),
+                calculateAzureStorageUsage(sa),
+                calculateAzureResourceCarbonPrint(sa.regionName())
+            ));
+        });
+
     } catch (ManagementException e) {
         logger.error("Azure management error: {}", e.getMessage(), e);
     } catch (Exception e) {
         logger.error("Unexpected error scanning Azure", e);
     }
-    
+
     return result;
 }
+
+
 
     
     private double calculateAzureVmUsage(VirtualMachine vm) {
