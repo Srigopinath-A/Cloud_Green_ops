@@ -15,17 +15,24 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-     protected void configure(HttpSecurity http) throws Exception {
-        http.authorizeHttpRequests(requests -> requests
-                .requestMatchers("/scorecard").permitAll() // Allow access to /scorecard
-                .anyRequest().authenticated())
-            .formLogin(form -> form.defaultSuccessUrl("/home", true)); // Configure form login using Lambda DSL
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/scorecard", "/login").permitAll()
+                .anyRequest().authenticated()
+            )
+            .formLogin(); // Use default login page
+
+        return http.build();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173")); // Your frontend URL
+        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
         configuration.setAllowCredentials(true);

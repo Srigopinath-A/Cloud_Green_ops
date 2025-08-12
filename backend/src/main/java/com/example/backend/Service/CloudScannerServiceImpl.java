@@ -1,8 +1,19 @@
 package com.example.backend.Service;
 
-import com.azure.core.management.AzureEnvironment;
-import com.azure.core.management.profile.AzureProfile;
-import com.azure.identity.DefaultAzureCredentialBuilder;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
 import com.azure.resourcemanager.AzureResourceManager;
 import com.azure.resourcemanager.compute.models.VirtualMachine;
 import com.azure.resourcemanager.storage.models.StorageAccount;
@@ -11,18 +22,20 @@ import com.example.backend.Config.GcpComputeClientFactory;
 import com.example.backend.Model.CloudResource;
 import com.example.backend.Model.CloudResourcer;
 import com.example.backend.Repo.CloudResourceRepository;
-import com.google.api.gax.core.FixedCredentialsProvider;
-import com.google.auth.oauth2.GoogleCredentials;
-import com.google.cloud.compute.v1.*;
+import com.google.api.client.util.Value;
+import com.google.cloud.compute.v1.InstancesClient;
+import com.google.cloud.compute.v1.RegionsClient;
+import com.google.cloud.compute.v1.Zone;
+import com.google.cloud.compute.v1.ZonesClient;
 import com.google.cloud.monitoring.v3.MetricServiceClient;
-import com.google.cloud.monitoring.v3.MetricServiceSettings;
-import com.google.monitoring.v3.*;
+import com.google.monitoring.v3.Aggregation;
+import com.google.monitoring.v3.ListTimeSeriesRequest;
+import com.google.monitoring.v3.Point;
+import com.google.monitoring.v3.ProjectName;
+import com.google.monitoring.v3.TimeInterval;
+import com.google.monitoring.v3.TimeSeries;
 import com.google.protobuf.util.Timestamps;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
+
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -31,13 +44,26 @@ import software.amazon.awssdk.services.ec2.model.DescribeInstancesResponse;
 import software.amazon.awssdk.services.ec2.model.Instance;
 import software.amazon.awssdk.services.ec2.model.Reservation;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.time.Instant;
-import java.util.*;
-
 @Service
 public class CloudScannerServiceImpl implements CloudScannerService {
+
+@Value("${azure.client-id}")
+private String clientId;
+
+@Value("${azure.client-secret}")
+private String clientSecret;
+
+@Value("${azure.tenant-id}")
+private String tenantId;
+
+@Value("${azure.subscription-id}")
+private String subscriptionId;
+
+@Autowired
+private AzureResourcemanagerFactor azureResourcemanagerFactor;
+
+
+
 
     private static final Logger logger = LoggerFactory.getLogger(CloudScannerServiceImpl.class);
     private static final Map<String, Double> CARBON_INTENSITY_DATA = Map.of(
@@ -62,11 +88,11 @@ public class CloudScannerServiceImpl implements CloudScannerService {
     private final Random random = new Random();
 
 
-    // --- REFACTOR: Use a single constructor for all dependencies (Spring best practice) ---
     public CloudScannerServiceImpl(CloudResourceRepository resourceRepository, GcpComputeClientFactory gcpComputeClientFactory) {
-        this.resourceRepository = resourceRepository;
-        this.gcpComputeClientFactory = gcpComputeClientFactory;
-    }
+            this.resourceRepository = resourceRepository;
+            this.gcpComputeClientFactory = gcpComputeClientFactory;
+            this.azureResourcemanagerFactor = azureResourcemanagerFactor;
+        }
 
     // This method will run automatically at 2 AM every day.
     @Scheduled(cron = "0 0 2 * * ?")
@@ -134,63 +160,47 @@ public class CloudScannerServiceImpl implements CloudScannerService {
     }
     
  
-    
-    @Override
-    public List<CloudResource> scanAzure() {
-        List<CloudResource> result = new ArrayList<>();
-        
-        String clientId = System.getenv("AZURE_CLIENT_ID");
-        String clientSecret = System.getenv("AZURE_CLIENT_SECRET");
-        String tenantId = System.getenv("AZURE_TENANT_ID");     
-        String subscriptionId = System.getenv("AZURE_SUBSCRIPTION_ID");
-
-        if (clientId == null || clientSecret == null || tenantId == null || subscriptionId == null) {
-            logger.error("Azure credentials not configured (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID)");
-            return result;
+     @Override
+public List<CloudResource> scanAzure() {
+    List<CloudResource> result = new ArrayList<>();
+    try {
+        logger.info("Scanning Azure Virtual Machines...");
+        for (VirtualMachine vm : azureResourcemanagerFactor.azureResourceManager().virtualMachines().list()) {
+            double usage = calculateAzureVmUsage(vm);
+            double carbonFootprint = calculateAzureResourceCarbonPrint(vm.regionName());
+            result.add(new CloudResource(
+                vm.id(),
+                "VirtualMachine",
+                "Azure",
+                vm.regionName(),
+                usage,
+                carbonFootprint
+            ));
         }
 
-        try {
-            // CORRECTED LINE: Call the method on the AUTOWIRED INSTANCE
-            AzureResourceManager azureResourceManager = AzureResourcemanagerFactor.createAzureResourceManager(
-                clientId, clientSecret, tenantId, subscriptionId
-            );
-
-            // Scan Virtual Machines
-            logger.info("Scanning Azure Virtual Machines...");
-            for (VirtualMachine vm : azureResourceManager.virtualMachines().list()) {
-                double usage = calculateAzureVmUsage(vm);
-                double carbonFootprint = calculateAzureResourceCarbonPrint(vm.regionName());
-                result.add(new CloudResource(
-                    vm.id(),
-                    "VirtualMachine",
-                    "Azure",
-                    vm.regionName(),
-                    usage,
-                    carbonFootprint
-                ));
-            }
-
-            // Scan Storage Accounts (Example)
-            logger.info("Scanning Azure Storage Accounts...");
-            for (StorageAccount sa : azureResourceManager.storageAccounts().list()) {
-                double usage = calculateAzureStorageUsage(sa);
-                double carbonFootprint = calculateAzureResourceCarbonPrint(sa.regionName());
-                result.add(new CloudResource(
-                    sa.id(),
-                    "StorageAccount",
-                    "Azure",
-                    sa.regionName(),
-                    usage,
-                    carbonFootprint
-                ));
-            }
-            logger.info("Successfully scanned {} Azure resources (VMs and Storage Accounts).", result.size());
-
-        } catch (Exception e) {
-            logger.error("Error scanning Azure resources: " + e.getMessage(), e);
+        logger.info("Scanning Azure Storage Accounts...");
+        for (StorageAccount sa : azureResourcemanagerFactor.azureResourceManager().storageAccounts().list()) {
+            double usage = calculateAzureStorageUsage(sa);
+            double carbonFootprint = calculateAzureResourceCarbonPrint(sa.regionName());
+            result.add(new CloudResource(
+                sa.id(),
+                "StorageAccount",
+                "Azure",
+                sa.regionName(),
+                usage,
+                carbonFootprint
+            ));
         }
-        return result;
+
+        logger.info("Azure scan completed with {} resources.", result.size());
+    } catch (Exception e) {
+        logger.error("Error scanning Azure resources", e);
     }
+    return result;
+}
+
+
+
 
 
     private double calculateAzureVmUsage(VirtualMachine vm) {
@@ -253,11 +263,12 @@ public class CloudScannerServiceImpl implements CloudScannerService {
         List<CloudResource> results = new ArrayList<>();
         String projectId = getGcpProjectId();
         if (projectId == null) return results;
-
-        try (InstancesClient instancesClient = gcpComputeClientFactory.createInstancesClient();
-             RegionsClient regionsClient = createRegionsClient();
-             ZonesClient zonesClient = createZonesClient();
-             MetricServiceClient metricClient = createMetricClient()) {
+try (
+    InstancesClient instancesClient = gcpComputeClientFactory.createInstancesClient();
+    RegionsClient regionsClient = gcpComputeClientFactory.createRegionsClient();
+    ZonesClient zonesClient = gcpComputeClientFactory.createZonesClient();
+    MetricServiceClient metricClient = gcpComputeClientFactory.createMetricServiceClient()
+) {
             
             List<String> regions = getAllRegions(regionsClient, projectId);
             for (String region : regions) {
