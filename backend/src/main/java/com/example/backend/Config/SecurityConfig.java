@@ -21,10 +21,11 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/scorecard", "/login").permitAll()
+                .requestMatchers("/scorecard/**").permitAll() // allow all scorecard endpoints
                 .anyRequest().authenticated()
             )
-            .formLogin(); // Use default login page
+            .formLogin(login -> login.disable()) // disable HTML login form for APIs
+            .httpBasic(); // optional: enable HTTP Basic for other endpoints
 
         return http.build();
     }
@@ -34,7 +35,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
+        configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

@@ -21,19 +21,19 @@ const AWSScorecard: React.FC = () => {
                     status: ['success', 'warning', 'critical'].includes(data.status) ? data.status as 'success' | 'warning' | 'critical' : 'warning',
                     totalCost: data.totalCost ?? 0,
                     ec2Instances: {
-                        running: data.ec2Instances?.running ?? 0,
-                        stopped: data.ec2Instances?.stopped ?? 0,
-                        totalCost: data.ec2Instances?.totalCost ?? 0,
-                        utilization: data.ec2Instances?.utilization ?? 0
+                        running: data.ec2Instances && typeof data.ec2Instances === 'object' && 'running' in data.ec2Instances ? Number(data.ec2Instances.running) : 0,
+                        stopped: data.ec2Instances && typeof data.ec2Instances === 'object' && 'stopped' in data.ec2Instances ? Number(data.ec2Instances.stopped) : 0,
+                        totalCost: data.ec2Instances && typeof data.ec2Instances === 'object' && 'totalCost' in data.ec2Instances ? Number(data.ec2Instances.totalCost) : 0,
+                        utilization: data.ec2Instances && typeof data.ec2Instances === 'object' && 'utilization' in data.ec2Instances ? Number(data.ec2Instances.utilization) : 0
                     },
                     rdsInstances: {
-                        active: data.rdsInstances?.active ?? 0,
-                        idle: data.rdsInstances?.idle ?? 0,
-                        performance: data.rdsInstances?.performance ?? 0
+                        active: data.rdsInstances && typeof data.rdsInstances === 'object' && 'active' in data.rdsInstances ? Number((data.rdsInstances as any).active) : 0,
+                        idle: data.rdsInstances && typeof data.rdsInstances === 'object' && 'idle' in data.rdsInstances ? Number((data.rdsInstances as any).idle) : 0,
+                        performance: data.rdsInstances && typeof data.rdsInstances === 'object' && 'performance' in data.rdsInstances ? Number((data.rdsInstances as any).performance) : 0
                     },
                     s3Usage: {
-                        totalStorage: data.s3Usage?.totalStorage ?? 0,
-                        accessPatterns: data.s3Usage?.accessPatterns ?? []
+                        totalStorage: data.s3Usage && typeof data.s3Usage === 'object' && 'totalStorage' in data.s3Usage ? Number((data.s3Usage as any).totalStorage) : 0,
+                        accessPatterns: data.s3Usage && typeof data.s3Usage === 'object' && 'accessPatterns' in data.s3Usage ? (data.s3Usage as any).accessPatterns : []
                     }
                 };
                 setScorecard(transformedData);

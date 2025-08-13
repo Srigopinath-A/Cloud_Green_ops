@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="
+           http://maven.apache.org/POM/4.0.0
+           https://maven.apache.org/xsd/maven-4.0.0.xsd
+         ">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -13,14 +16,14 @@
 
     <groupId>com.example</groupId>
     <artifactId>backend</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1‑SNAPSHOT</version>
     <name>backend</name>
     <description>backend application</description>
 
     <properties>
         <java.version>21</java.version>
         <spring-cloud-gcp.version>5.3.0</spring-cloud-gcp.version>
-        <azure-sdk-bom.version>1.2.32</azure-sdk-bom.version>
+        <azure-sdk-bom.version>1.2.33</azure-sdk-bom.version>
     </properties>
 
     <dependencyManagement>
@@ -33,16 +36,14 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-
-<dependency>
+            <!-- Azure SDK BOM -->
+            <dependency>
                 <groupId>com.azure</groupId>
                 <artifactId>azure-sdk-bom</artifactId>
                 <version>${azure-sdk-bom.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!-- Azure SDK BOM for consistent versioning -->
-            
         </dependencies>
     </dependencyManagement>
 
@@ -73,7 +74,7 @@
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
-        <!-- Google Cloud Dependencies (version managed by BOM) -->
+        <!-- Google Cloud Dependencies -->
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-monitoring</artifactId>
@@ -99,12 +100,11 @@
             <artifactId>protobuf-java-util</artifactId>
         </dependency>
 
-        <!-- Azure SDK Dependencies with BOM-managed versions -->
         <!-- Azure SDK Dependencies -->
-<dependency>
+        <dependency>
             <groupId>com.azure.resourcemanager</groupId>
             <artifactId>azure-resourcemanager</artifactId>
-            <version>2.33.0</version>
+            <version>2.49.0</version>
         </dependency>
         <dependency>
             <groupId>com.azure</groupId>
@@ -113,30 +113,35 @@
         <dependency>
             <groupId>com.azure.resourcemanager</groupId>
             <artifactId>azure-resourcemanager-compute</artifactId>
+            <version>2.49.0</version>
         </dependency>
         <dependency>
             <groupId>com.azure.resourcemanager</groupId>
             <artifactId>azure-resourcemanager-storage</artifactId>
+            <version>2.49.0</version>
         </dependency>
         <dependency>
-            <groupId>com.azure</groupId>
-            <artifactId>azure-core-http-netty</artifactId>
+    <groupId>com.azure</groupId>
+    <artifactId>azure-core-http-netty</artifactId>
+    <version>1.15.11</version>
+</dependency>
+
+        <!-- AWS SDK (with explicit version) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>ec2</artifactId>
+            <version>2.20.120</version>
         </dependency>
-    <dependency>
-    <groupId>software.amazon.awssdk</groupId>
-    <artifactId>ec2</artifactId>
-    <version>2.20.120</version>
-</dependency>
-<dependency>
-    <groupId>software.amazon.awssdk</groupId>
-    <artifactId>auth</artifactId>
-    <version>2.20.120</version>
-</dependency>
-<dependency>
-    <groupId>software.amazon.awssdk</groupId>
-    <artifactId>regions</artifactId>
-    <version>2.20.120</version>
-</dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>auth</artifactId>
+            <version>2.20.120</version>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>regions</artifactId>
+            <version>2.20.120</version>
+        </dependency>
 
         <!-- Dev & Test Dependencies -->
         <dependency>

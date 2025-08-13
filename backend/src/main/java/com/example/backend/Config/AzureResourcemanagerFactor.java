@@ -2,6 +2,7 @@ package com.example.backend.Config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import com.azure.core.management.AzureEnvironment;
@@ -12,7 +13,7 @@ import com.azure.resourcemanager.AzureResourceManager;
 
 import jakarta.annotation.PostConstruct;
 
-@Component
+@Configuration
 public class AzureResourcemanagerFactor {
 
     @Value("${azure.client-id}")
@@ -29,12 +30,12 @@ public class AzureResourcemanagerFactor {
 
     @PostConstruct
     public void verifyConfig() {
-        System.out.println("Azure config: " + clientId + ", tenant: " + tenantId + ", subscription: " + subscriptionId);
+        System.out.println("Azure config loaded: " + clientId + ", tenant: " + tenantId);
     }
 
     @Bean
     public AzureResourceManager azureResourceManager() {
-        ClientSecretCredential cred = new ClientSecretCredentialBuilder()
+        ClientSecretCredential credential = new ClientSecretCredentialBuilder()
             .clientId(clientId)
             .clientSecret(clientSecret)
             .tenantId(tenantId)
@@ -42,6 +43,9 @@ public class AzureResourcemanagerFactor {
 
         AzureProfile profile = new AzureProfile(tenantId, subscriptionId, AzureEnvironment.AZURE);
 
-        return AzureResourceManager.authenticate(cred, profile).withSubscription(subscriptionId);
+        return AzureResourceManager
+            .authenticate(credential, profile)
+            .withSubscription(subscriptionId);
     }
 }
+

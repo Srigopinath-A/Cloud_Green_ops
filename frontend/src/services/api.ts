@@ -1,113 +1,110 @@
-const API_BASE_URL = 'http://localhost:8080'; // Update with your backend URL
+// Hardcoded backend URL & credentials
+const API_BASE_URL = "http://localhost:8080";
+const USERNAME = "admin";
+const PASSWORD = "admin123";
 
-// 👇 Add your credentials here for local development only
-const USERNAME = 'admin';
-const PASSWORD = 'admin123';
-
-// 👇 Helper to create the Authorization header
+// Add Basic Auth header
 const getAuthHeaders = (): HeadersInit => ({
-    'Authorization': `Basic ${btoa(`${USERNAME}:${PASSWORD}`)}`,
-    'Content-Type': 'application/json',
+  "Content-Type": "application/json",
+  "Authorization": `Basic ${btoa(`${USERNAME}:${PASSWORD}`)}`
 });
 
 interface ErrorResponse {
-    message: string;
-    status: number;
+  message: string;
+  status: number;
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-        const error: ErrorResponse = await response.json();
-        throw new Error(error.message || 'An error occurred');
+  if (!response.ok) {
+    try {
+      const error: ErrorResponse = await response.json();
+      throw new Error(error.message || "An error occurred");
+    } catch {
+      throw new Error(`HTTP error: ${response.status}`);
     }
-    return response.json();
+  }
+  return response.json();
 }
 
-// Base common response interface
+// Common Scorecard interface
 export interface ScorecardResponse {
-    id: string;
-    timestamp: string;
-    carbonEmissions: number;
-    resourceUtilization: number;
-    recommendations: string[];
-    totalCost: number;
-    status: 'success' | 'warning' | 'critical' | string;
+  id: string;
+  timestamp: string;
+  carbonEmissions: number;
+  resourceUtilization: number;
+  recommendations: string[];
+  totalCost: number;
+  status: "success" | "warning" | "critical" | string;
 }
 
-// GCP Compute Engine instance details
 export interface ComputeEngineInstance {
-    name: string;
-    region: string;
-    cpuUtilization: number;
-    status: string;
-    recommendation?: string;
+  name: string;
+  region: string;
+  cpuUtilization: number;
+  status: string;
+  recommendation?: string;
 }
 
-// GCP Scorecard interface matching your frontend needs
 export interface GCPScorecard extends ScorecardResponse {
-    networkUsage: {
-        ingress: number;
-        egress: number;
-        cost: number;
-    };
-    cloudStorage: {
-        bucketCount: number;
-        totalSize: number;
-    };
-    computeEngine: ComputeEngineInstance[];
-    gcpSpecificMetrics?: {
-        computeEngineUsage: number;
-    };
+  networkUsage: {
+    ingress: number;
+    egress: number;
+    cost: number;
+  };
+  cloudStorage: {
+    bucketCount: number;
+    totalSize: number;
+  };
+  computeEngine: ComputeEngineInstance[];
+  gcpSpecificMetrics?: {
+    computeEngineUsage: number;
+  };
 }
 
-// AWS and Azure interfaces (can be updated similarly)
 export interface AWSScorecard extends ScorecardResponse {
-    storage: Record<string, unknown>;
-    services: unknown[];
-    virtualMachines: unknown;
-    rdsInstances: unknown;
-    s3Usage: unknown;
-    ec2Instances: unknown;
-    awsSpecificMetrics?: {
-        ec2Utilization: number;
-        rdsEfficiency: number;
-    };
+  storage: Record<string, unknown>;
+  services: unknown[];
+  virtualMachines: unknown;
+  rdsInstances: unknown;
+  s3Usage: unknown;
+  ec2Instances: unknown;
+  awsSpecificMetrics?: {
+    ec2Utilization: number;
+    rdsEfficiency: number;
+  };
 }
 
 export interface AzureScorecard extends ScorecardResponse {
-    services: unknown;
-    storage: unknown;
-    virtualMachines: unknown;
-    azureSpecificMetrics?: {
-        vmUtilization: number;
-    };
+  services: unknown;
+  storage: unknown;
+  virtualMachines: unknown;
+  azureSpecificMetrics?: {
+    vmUtilization: number;
+  };
 }
 
 // Fetch functions
 export const fetchAWSScorecard = async (date?: string): Promise<AWSScorecard> => {
-    const dateParam = date ? `?date=${date}` : '';
-    const response = await fetch(`${API_BASE_URL}/scorecard/aws${dateParam}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-    });
-    return handleResponse<AWSScorecard>(response);
-};
-
-import { Scorecard } from '../types';
-
-export const fetchGCPScorecard = async (): Promise<Scorecard> => {
-  const res = await fetch(`${API_BASE_URL}/scorecard/gcp`, {
-    method: 'GET',
-    headers: getAuthHeaders()
+  const dateParam = date ? `?date=${date}` : "";
+  const response = await fetch(`${API_BASE_URL}/scorecard/aws${dateParam}`, {
+    method: "GET",
+    headers: getAuthHeaders(),
   });
-  return handleResponse<Scorecard>(res);
+  return handleResponse<AWSScorecard>(response);
 };
 
+export const fetchGCPScorecard = async (): Promise<GCPScorecard> => {
+  const response = await fetch(`${API_BASE_URL}/scorecard/gcp`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<GCPScorecard>(response);
+};
 
 export const fetchAzureScorecard = async (): Promise<AzureScorecard> => {
-    const response = await fetch(`${API_BASE_URL}/scorecard/azure`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-    });
-    return handleResponse<AzureScorecard>(response);
+  const response = await fetch(`${API_BASE_URL}/scorecard/azure`, {
+    method: "GET",
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<AzureScorecard>(response);
 };

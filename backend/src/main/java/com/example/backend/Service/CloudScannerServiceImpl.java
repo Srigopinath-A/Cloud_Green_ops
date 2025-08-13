@@ -47,22 +47,20 @@ import software.amazon.awssdk.services.ec2.model.Reservation;
 @Service
 public class CloudScannerServiceImpl implements CloudScannerService {
 
-@Value("${azure.client-id}")
-private String clientId;
+// @Value("${azure.client-id}")
+// private String clientId;
 
-@Value("${azure.client-secret}")
-private String clientSecret;
+// @Value("${azure.client-secret}")
+// private String clientSecret;
 
-@Value("${azure.tenant-id}")
-private String tenantId;
+// @Value("${azure.tenant-id}")
+// private String tenantId;
 
-@Value("${azure.subscription-id}")
-private String subscriptionId;
+// @Value("${azure.subscription-id}")
+// private String subscriptionId;
 
-@Autowired
-private AzureResourcemanagerFactor azureResourcemanagerFactor;
-
-
+ @Autowired
+    private AzureResourceManager azureResourceManager;
 
 
     private static final Logger logger = LoggerFactory.getLogger(CloudScannerServiceImpl.class);
@@ -91,7 +89,6 @@ private AzureResourcemanagerFactor azureResourcemanagerFactor;
     public CloudScannerServiceImpl(CloudResourceRepository resourceRepository, GcpComputeClientFactory gcpComputeClientFactory) {
             this.resourceRepository = resourceRepository;
             this.gcpComputeClientFactory = gcpComputeClientFactory;
-            this.azureResourcemanagerFactor = azureResourcemanagerFactor;
         }
 
     // This method will run automatically at 2 AM every day.
@@ -161,44 +158,29 @@ private AzureResourcemanagerFactor azureResourcemanagerFactor;
     
  
      @Override
-public List<CloudResource> scanAzure() {
-    List<CloudResource> result = new ArrayList<>();
-    try {
-        logger.info("Scanning Azure Virtual Machines...");
-        for (VirtualMachine vm : azureResourcemanagerFactor.azureResourceManager().virtualMachines().list()) {
-            double usage = calculateAzureVmUsage(vm);
-            double carbonFootprint = calculateAzureResourceCarbonPrint(vm.regionName());
-            result.add(new CloudResource(
-                vm.id(),
-                "VirtualMachine",
-                "Azure",
-                vm.regionName(),
-                usage,
-                carbonFootprint
-            ));
-        }
+    public List<CloudResource> scanAzure() {
+        List<CloudResource> result = new ArrayList<>();
+        try {
+            logger.info("Scanning Azure Virtual Machines...");
+            for (VirtualMachine vm : azureResourceManager.virtualMachines().list()) {
+                double usage = calculateAzureVmUsage(vm);
+                double carbonFootprint = calculateAzureResourceCarbonPrint(vm.regionName());
+                result.add(new CloudResource(vm.id(), "VirtualMachine", "Azure", vm.regionName(), usage, carbonFootprint));
+            }
 
-        logger.info("Scanning Azure Storage Accounts...");
-        for (StorageAccount sa : azureResourcemanagerFactor.azureResourceManager().storageAccounts().list()) {
-            double usage = calculateAzureStorageUsage(sa);
-            double carbonFootprint = calculateAzureResourceCarbonPrint(sa.regionName());
-            result.add(new CloudResource(
-                sa.id(),
-                "StorageAccount",
-                "Azure",
-                sa.regionName(),
-                usage,
-                carbonFootprint
-            ));
-        }
+            logger.info("Scanning Azure Storage Accounts...");
+            for (StorageAccount sa : azureResourceManager.storageAccounts().list()) {
+                double usage = calculateAzureStorageUsage(sa);
+                double carbonFootprint = calculateAzureResourceCarbonPrint(sa.regionName());
+                result.add(new CloudResource(sa.id(), "StorageAccount", "Azure", sa.regionName(), usage, carbonFootprint));
+            }
 
-        logger.info("Azure scan completed with {} resources.", result.size());
-    } catch (Exception e) {
-        logger.error("Error scanning Azure resources", e);
+            logger.info("Azure scan completed with {} resources.", result.size());
+        } catch (Exception e) {
+            logger.error("Error scanning Azure resources", e);
+        }
+        return result;
     }
-    return result;
-}
-
 
 
 
