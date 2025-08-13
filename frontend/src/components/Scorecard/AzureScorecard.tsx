@@ -75,4 +75,5 @@ const AzureScorecard: React.FC = () => {
   );
 };
 
+
 export default AzureScorecard;
