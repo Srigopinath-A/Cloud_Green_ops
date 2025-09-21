@@ -277,7 +277,7 @@ try (
     }
 
     private String getGcpProjectId() {
-        String projectId = "custom-healer-458206-t8";
+        String projectId = "our-vigil-470916-i8";
         if (projectId == null || projectId.isEmpty()) {
             logger.error("GCP_PROJECT_ID environment variable not set");
             return null;

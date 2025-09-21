@@ -28,7 +28,35 @@ export interface AWSMetrics extends BaseMetrics {
     };
 }
 
-export interface GCPMetrics extends ScorecardResponse {
+/* ✅ Updated GCPMetrics and Scorecard */
+export interface Resource {
+    id: string;
+    type: string;
+    provider: string;
+    region: string;
+    usage: number;
+    carbonfootprint: number;
+}
+
+export interface ResourceFinding {
+    resource: Resource;
+    details: string;
+    issueType: string;
+}
+
+export interface RemediationPlan {
+    finding: ResourceFinding;
+    actions: string;
+    aiExplanation: string;
+}
+
+export interface Scorecard {
+    sustainabilityScore: number;
+    week: string;
+    remediationPlan: RemediationPlan[];
+}
+
+export interface GCPMetrics extends Scorecard {
     totalCost: number;
     status: 'success' | 'warning' | 'critical';
     networkUsage: {
@@ -49,7 +77,7 @@ export interface GCPMetrics extends ScorecardResponse {
     }[];
 }
 
-
+/* -------------------- */
 
 export interface AzureMetrics extends BaseMetrics {
     virtualMachines: {
@@ -84,11 +112,4 @@ export interface FilterOptions {
     endDate?: Date;
     provider?: CloudProvider;
     resourceType?: string;
-}
-
-
-export interface Scorecard {
-  score: number;
-  week: string;
-  recommendations: { recommendation: string }[];
 }

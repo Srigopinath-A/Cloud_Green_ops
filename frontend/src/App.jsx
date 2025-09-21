@@ -8,7 +8,7 @@ function App() {
       <header className="app-header">
         <h1>Cloud Green Ops Dashboard</h1>
         <p>Monitor and optimize your cloud resource efficiency</p>
-      </header>
+      </header> 
       
       <main className="app-main">
         <ScorecardDashboard />

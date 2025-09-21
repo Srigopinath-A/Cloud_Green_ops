@@ -26,7 +26,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-// Common Scorecard interface
+// =======================
+// ✅ Common Scorecard interface (AWS & Azure still use this)
+// =======================
 export interface ScorecardResponse {
   id: string;
   timestamp: string;
@@ -37,30 +39,39 @@ export interface ScorecardResponse {
   status: "success" | "warning" | "critical" | string;
 }
 
-export interface ComputeEngineInstance {
-  name: string;
+// =======================
+// ✅ GCP Scorecard (customized to backend JSON)
+// =======================
+export interface Resource {
+  id: string;
+  type: string;
+  provider: string;
   region: string;
-  cpuUtilization: number;
-  status: string;
-  recommendation?: string;
+  usage: number;
+  carbonfootprint: number;
 }
 
-export interface GCPScorecard extends ScorecardResponse {
-  networkUsage: {
-    ingress: number;
-    egress: number;
-    cost: number;
-  };
-  cloudStorage: {
-    bucketCount: number;
-    totalSize: number;
-  };
-  computeEngine: ComputeEngineInstance[];
-  gcpSpecificMetrics?: {
-    computeEngineUsage: number;
-  };
+export interface ResourceFinding {
+  resource: Resource;
+  details: string;
+  issueType: string;
 }
 
+export interface RemediationPlan {
+  finding: ResourceFinding;
+  actions: string;
+  aiExplanation: string;
+}
+
+export interface GCPScorecardResponse {
+  sustainabilityScore: number;
+  week: string;
+  remediationPlan: RemediationPlan[];
+}
+
+// =======================
+// ✅ AWS & Azure remain unchanged
+// =======================
 export interface AWSScorecard extends ScorecardResponse {
   storage: Record<string, unknown>;
   services: unknown[];
@@ -83,7 +94,9 @@ export interface AzureScorecard extends ScorecardResponse {
   };
 }
 
-// Fetch functions
+// =======================
+// ✅ Fetch functions
+// =======================
 export const fetchAWSScorecard = async (date?: string): Promise<AWSScorecard> => {
   const dateParam = date ? `?date=${date}` : "";
   const response = await fetch(`${API_BASE_URL}/scorecard/aws${dateParam}`, {
@@ -93,12 +106,12 @@ export const fetchAWSScorecard = async (date?: string): Promise<AWSScorecard> =>
   return handleResponse<AWSScorecard>(response);
 };
 
-export const fetchGCPScorecard = async (): Promise<GCPScorecard> => {
+export const fetchGCPScorecard = async (): Promise<GCPScorecardResponse> => {
   const response = await fetch(`${API_BASE_URL}/scorecard/gcp`, {
     method: "GET",
     headers: getAuthHeaders(),
   });
-  return handleResponse<GCPScorecard>(response);
+  return handleResponse<GCPScorecardResponse>(response);
 };
 
 export const fetchAzureScorecard = async (): Promise<AzureScorecard> => {
