@@ -62,7 +62,7 @@ public class ScoreCardImple implements ScorecardService {
                 logger.error("Failed to scan AWS resources: {}", e.getMessage());
             }
             
-            allResources.addAll(cloudscanner.scanAzure());
+          
             allResources.addAll(cloudscanner.scanGcp());
 
             logger.info("Total resources scanned: {}", allResources.size());
@@ -104,6 +104,8 @@ public class ScoreCardImple implements ScorecardService {
                 return new Scorecardaws(100.0, List.of(), "Week of " + startOfWeek.toString().substring(0, 10));
             }
 
+
+
             List<CloudResourcer> averagedResources = averageResourcesOverWeek(weeklySnapshots);
             List<ResourceFindingaws> findings = analyzerService.analyzeaws(averagedResources);
             List<Rcommendationaws> recommendations = genAiRecommendationService.recommedaws(findings);
@@ -122,24 +124,37 @@ public class ScoreCardImple implements ScorecardService {
     @Override
     public Scorecard generateAzureWeeklyScorecard() {
         try {
-            logger.info("Starting to generate Azure-specific weekly scorecard...");
-            List<CloudResource> azureResources = cloudscanner.scanAzure();
-            logger.info("Azure resources scanned: {}", azureResources.size());
+            logger.info("Starting to generate weekly scorecard...");
+            
+            // Initialize empty lists for each cloud provider
+            List<CloudResource> allResources = new ArrayList<>();
+            
+            // Scan each cloud provider separately and handle results properly
+            try {
+                List<CloudResource> awsResources = safeCastToCloudResourceList(cloudscanner.scanAws());
+                allResources.addAll(awsResources);
+            } catch (Exception e) {
+                logger.error("Failed to scan AWS resources: {}", e.getMessage());
+            }
+            
+            allResources.addAll(cloudscanner.scanAzure());
 
-            List<ResourceFinding> findings = analyzerService.analyze(azureResources);
-            logger.info("Azure findings identified: {}", findings.size());
+            logger.info("Total resources scanned: {}", allResources.size());
+            
+            List<ResourceFinding> findings = analyzerService.analyze(allResources);
+            logger.info("Total findings identified: {}", findings.size());
             
             List<Rcommendation> recommendations = genAiRecommendationService.recommed(findings);
-            logger.info("Azure recommendations generated: {}", recommendations.size());
+            logger.info("Generated recommendations: {}", recommendations.size());
 
-            double score = calculateScoreForAzure(findings);
+            double score = calculateScore(findings);
             String week = LocalDate.now().toString();
             
-            logger.info("Azure scorecard generated successfully with score: {}", score);
+            logger.info("Weekly scorecard generated successfully with score: {}", score);
             return new Scorecard(score, recommendations, week);
         } catch (Exception e) {
-            logger.error("Error generating Azure scorecard: {}", e.getMessage(), e);
-            throw new RuntimeException("Error generating Azure weekly scorecard", e);
+            logger.error("Error generating weekly scorecard: {}", e.getMessage(), e);
+            throw new RuntimeException("Error generating weekly scorecard", e);
         }
     }
 
